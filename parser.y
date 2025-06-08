@@ -8,6 +8,8 @@
 #include "function_table.h"
 #include "expr_value.h"
 
+#include "code_generation.h"
+
 // get token that recognized by scanner
 extern int yylex();
 extern int yyparse();
@@ -1291,6 +1293,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // get file name
+    std::string filename(argv[1]);
+    size_t last_dot = filename.find_last_of('.');
+    std::string class_name = (last_dot == std::string::npos) ? filename : filename.substr(0, last_dot);
+
+    // create class code generator
+    CodeGenerator codeGen(class_name);
+
     printf("Starting parsing...\n");
 
     // Initialize the symbol table
@@ -1316,5 +1326,5 @@ int main(int argc, char **argv) {
 
     fclose(yyin);
     return 0;
-    /* 連夜趕工才發現自己根本越寫越歪，只要做syntax analysis就好，多做了很多沒用的功能，到最後程式變成一團spaghetti, bruh */
+    
 }
