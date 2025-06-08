@@ -1,18 +1,18 @@
-# Project2-Parser
+# Project3-Code-Generation
 
 ## Quick Start
 
     $make
 
-## scanner.l 修改部分
+## Project2 已知問題
 
-*   修正部分comment辨識，原本在行號計算有問題
-*   將辨認出的token以yylval，把實際字串傳遞給parser
-    *   並return parser中定義的token，以傳遞兩邊對應的token
+1.   在declaration時的type check，如: int a = 3.5; 要檢查出type dismatch
+2.   非void的function call一定要有一個變數assign，如: a = fun1(x, y); (func1為有return type的function)
+3.   for loop 和 foreach未完成
+4.   把symbol table存value都砍掉，包括const
+5.   if或loop等等後的單行statement也要是一個block(要有一個symbol table)
 
-## 運行步驟
+## 已修正
 
-1.  Terminal中輸入$make，會直接編lex, yacc，並直接gcc編譯後，執行test.sd
-2.  make完後依舊可以輸入$./parser /你要的測試程式/
-3.  make clean以清除lex.yy.c, y.tab.c等檔案
+1, 4
     
