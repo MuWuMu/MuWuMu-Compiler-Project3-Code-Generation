@@ -7,7 +7,6 @@
 #include "symbol_table.h"
 #include "function_table.h"
 #include "expr_value.h"
-// #include "array_utils.h"
 
 // get token that recognized by scanner
 extern int yylex();
@@ -51,8 +50,6 @@ void yywarning(const char *s) {
     bool boolval;    // For boolean constants
     char *text;     // For string constants (ID, string...)
     Parameter *param ; // For function parameters
-    DimensionInfo *dim_info; // For array dimensions
-    IndexAccessInfo *idx_acc_info; // For array access indices
     ExprValue expr_val;
 }
 
@@ -70,13 +67,10 @@ void yywarning(const char *s) {
 %type <node> declarator_list
 %type <expr_val> expression
 %type <expr_val> arithmetic_expression
-%type <node> array_initializer
 %type <param> parameter_list
 %type <param> argument_list
 %type <param> argument_list_actual
 %type <expr_val> function_invocation
-%type <dim_info> dimension_specifiers
-%type <idx_acc_info> array_indices
 
 %left OP_OR
 %left OP_AND
@@ -109,22 +103,17 @@ declaration:
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else if (current->type != NULL) {
-                switch (current->type) {
-                    case "INT":
-                        if ($1 != "int")
-                            yyerror("Type mismatch in declaration");
-                    case "REAL":
-                        if ($1 != "float" && $1 != "double")
-                            yyerror("Type mismatch in declaration");
-                    case "BOOL":
-                        if ($1 != "bool")
-                            yyerror("Type mismatch in declaration");
-                    case "STRING":
-                        if ($1 != "string" && $1 != "char")
-                            yyerror("Type mismatch in declaration");
-                }
+                // type check
+                if (current->type == "INT" && $1 != "int") 
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "REAL" && $1 != "float" && $1 != "double")
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "BOOL" && $1 != "bool")
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "STRING" && $1 != "string" && $1 != "char")
+                    yyerror("Type mismatch in declaration");
             } else {
-                insertSymbol(currentTable, current->name, $1, 0, 0, NULL, NULL/*current->value*/);
+                insertSymbol(currentTable, current->name, $1, 0);
             }
             current = current->next;
         }
@@ -138,47 +127,25 @@ declaration:
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
             } else if (current->type != NULL) {
-                switch (current->type) {
-                    case "INT":
-                        if ($2 != "int")
-                            yyerror("Type mismatch in declaration");
-                    case "REAL":
-                        if ($2 != "float" && $2 != "double")
-                            yyerror("Type mismatch in declaration");
-                    case "BOOL":
-                        if ($2 != "bool")
-                            yyerror("Type mismatch in declaration");
-                    case "STRING":
-                        if ($2 != "string" && $2 != "char")
-                            yyerror("Type mismatch in declaration");
-                }
+                // type check
+                if (current->type == "INT" && $2 != "int") 
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "REAL" && $2 != "float" && $2 != "double")
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "BOOL" && $2 != "bool")
+                    yyerror("Type mismatch in declaration");
+                else if (current->type == "STRING" && $2 != "string" && $2 != "char")
+                    yyerror("Type mismatch in declaration");
             } else if (current->value == NULL) {
                 yyerror("Const variable must be initialized");
             } else {
-                insertSymbol(currentTable, current->name, $2, 1, 0, NULL, NULL/*current->value*/); // set as const
+                insertSymbol(currentTable, current->name, $2, 1); // set as const
                 // printf("Initialized const variable: %s with value\n", current->name);   // for debugging
             }
             current = current->next;
         }
     }
-    // array declaration
-    | array_declaration
     ;
-
-dimension_specifiers:
-    DELIM_LBRACK INT DELIM_RBRACK {
-        if ($2 <= 0) {
-            yyerror("Array size must be greater than 0");
-        } 
-        $$ = create_dimension_list($2);
-    }
-    | dimension_specifiers DELIM_LBRACK INT DELIM_RBRACK {
-        if ($3 <= 0) {
-            yyerror("Array size must be greater than 0");
-        } 
-        $$ = add_dimension_to_list($1, $3);
-    }
-
 type_specifier:
     KW_INT { $$ = "int";}
     | KW_FLOAT { $$ = "float";}
@@ -209,7 +176,7 @@ declarator_list:
         // multi declaration without initialization
         $$ = (Node *)malloc(sizeof(Node));
         $$->name = strdup($1);
-        $$->type = $3.type;
+        $$->type = $3->type;
         $$->next = $3;
         $$->value = NULL;
     }
@@ -223,283 +190,8 @@ declarator_list:
     }
     ;
 
-array_declaration:
-    type_specifier ID dimension_specifiers DELIM_SEMICOLON {
-        printf("Array declaration without initialization: type=%s\n", $1);    // for debugging
-        if (lookupSymbolInCurrentTable(currentTable, $2)) {
-            yyerror("Duplicate declaration of array");
-            free_dimension_info($3); // free dimension info
-        } else {
-            insertSymbol(currentTable, $2, $1, 0, 1, $3, NULL); // NULL for no initialization
-            // void *arr_data = create_md_array_data($1, $3); // $1 is string, $3 is DimensionInfo
-            // if (arr_data) {
-            //     initialize_md_array_data(arr_data, $1, $3, NULL); // NULL to default init
-            //     insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
-            // } else {
-            //     yyerror("Failed to create multi-dimensional array data");
-            //     free_dimension_info($3); // free dimension info
-            // }
-            if ($3) {
-                free_dimension_info($3); // free dimension info
-            }
-        }
-    }
-    | type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
-        printf("Array declaration with initialization: type=%s\n", $1);    // for debugging
-        if (lookupSymbolInCurrentTable(currentTable, $2)) {
-            yyerror("Duplicate declaration of array");
-        } else {
-            insertSymbol(currentTable, $2, $1, 0, 1, $3, NULL); // NULL for no initialization
-            // long total_elements = $3->total_elements; // total number of elements in the array
-            // int num_inits = count_initializers($6); // Node*
-            // if (num_inits > total_elements) {
-            //     yyerror("Too many initializers for array");
-            //     free_dimension_info($3); // free dimension info
-            // } else {
-            //     void *arr_data = create_md_array_data($1, $3);
-            //     if (arr_data) {
-            //         initialize_md_array_data(arr_data, $1, $3, $6);
-            //         insertSymbol(currentTable, $2, $1, 0, 1, $3, arr_data);
-            //     } else {
-            //         yyerror("Failed to create multi-dimensional array data");
-            //         free_dimension_info($3); // free dimension info
-            //     }
-            //     // last, free array_initializer list
-            //     Node *curr = $6, *next_node;
-            //     while (curr) {
-            //         next_node = curr->next;
-            //         if (curr->value) {
-            //             free(curr->value);
-            //         }
-            //         free(curr);
-            //         curr = next_node;
-            //     }
-            // }
-        }
-        if ($3) {
-            free_dimension_info($3); // free dimension info
-        }
-
-        // clean array_initializer list
-        Node *curr = $6, *next_node;
-        while (curr != NULL) {
-            next_node = curr->next;
-            if (curr->value) {
-                free(curr->value);
-            }
-            free(curr);
-            curr = next_node;
-        }
-    }
-    | KW_CONST type_specifier ID dimension_specifiers OP_ASSIGN DELIM_LBRACE array_initializer DELIM_RBRACE DELIM_SEMICOLON {
-        printf("Const array declaration with initialization: type=%s\n", $2);    // for debugging
-        if (lookupSymbolInCurrentTable(currentTable, $3)) {
-            yyerror("Duplicate declaration of array");
-        } else {
-            insertSymbol(currentTable, $3, $2, 1, 1, $4, NULL); // NULL for no initialization
-            // long total_elements = $4->total_elements;
-            // int num_inits = count_initializers($7);
-            // if (num_inits > total_elements) {
-            //     yyerror("Too many initializers for const array");
-            //     free_dimension_info($4); // free dimension info
-            // } else {
-            //     void *arr_data = create_md_array_data($2, $4);
-            //     if (arr_data) {
-            //         initialize_md_array_data(arr_data, $2, $4, $7);
-            //         insertSymbol(currentTable, $3, $2, 1, 1, $4, arr_data); // set as const
-            //     } else {
-            //         yyerror("Failed to create multi-dimensional const array data");
-            //         free_dimension_info($4); // free dimension info
-            //     }
-            //     // free array_initializer list
-            //     Node *curr = $7, *next_node;
-            //     while (curr) {
-            //         next_node = curr->next;
-            //         if (curr->value) {
-            //             free(curr->value);
-            //         }
-            //         free(curr);
-            //         curr = next_node;
-            //     }
-            // }
-        }
-        if ($4) {
-            free_dimension_info($4); // free dimension info
-        }
-
-        // clean array_initializer list
-        Node *curr = $7, *next_node;
-        while (curr != NULL) {
-            next_node = curr->next;
-            if (curr->value) {
-                free(curr->value);
-            }
-            free(curr);
-            curr = next_node;
-        }
-    }
-    | KW_CONST type_specifier ID dimension_specifiers DELIM_SEMICOLON {
-        // const array declaration without initialization (invalid)
-        yyerror("Const array must be initialized");
-        if ($4) {
-            free_dimension_info($4); // free dimension info
-        }
-    }
-    ;
-
-array_initializer:
-    expression {
-        // single initialization value
-        $$ = (Node *)malloc(sizeof(Node));
-        $$->value = $1.value;
-        $$->next = NULL;
-    }
-    | expression DELIM_COMMA array_initializer {
-        // multi initialization values
-        $$ = (Node *)malloc(sizeof(Node));
-        $$->value = $1.value;
-        $$->next = $3;
-    }
-    ;
-
-array_indices:
-    DELIM_LBRACK expression DELIM_RBRACK {
-        if (strcmp($2.type, "INT") != 0) {
-            yyerror("Array index must be an integer");
-            if ($2.value) {
-                free($2.value); // free the value if it was allocated
-            }
-            $$ = NULL; // set to NULL to avoid using uninitialized value
-        } else {
-            $$ = (IndexAccessInfo *)malloc(sizeof(IndexAccessInfo));
-            if (!$$) {
-                yyerror("Memory allocation failed for array index access info");
-                if ($2.value) {
-                    free($2.value); // free the value if it was allocated
-                }
-            }
-            $$->num_indices = 1; // single index
-            $$->indices = (int *)malloc(sizeof(int));
-            if (!$$->indices) {
-                yyerror("Memory allocation failed for indices array");
-                free($$); // free the IndexAccessInfo struct
-                if ($2.value) {
-                    free($2.value); // free the value if it was allocated
-                }
-            }
-            $$->indices[0] = *(int *)$2.value; // store the index value
-            free($2.value); // free the value after using it
-        }
-    }
-    | array_indices DELIM_LBRACK expression DELIM_RBRACK {
-        if (!$1) { // Error in preceding part of index list
-            if ($3.value) free($3.value);
-            $$ = NULL;
-            YYERROR; // Propagate error
-        } else if (strcmp($3.type, "INT") != 0) {
-            yyerror("Array index must be an integer expression");
-            if ($3.value) free($3.value);
-            // Clean up $1
-            free($1->indices);
-            free($1);
-            $$ = NULL;
-            YYERROR;
-        } else {
-            int new_num_indices = $1->num_indices + 1;
-            int *new_indices_ptr = (int *)realloc($1->indices, new_num_indices * sizeof(int));
-            if (!new_indices_ptr) {
-                yyerror("Memory reallocation failed for indices array");
-                if ($3.value) free($3.value);
-                free($1->indices); // Free old indices
-                free($1);          // Free the IndexAccessInfo struct
-                $$ = NULL;
-                YYABORT; // Critical error
-            }
-            $1->indices = new_indices_ptr;
-            $1->num_indices = new_num_indices;
-            $1->indices[$1->num_indices - 1] = *(int *)$3.value;
-            $$ = $1; // Pass along the extended list
-            free($3.value); // Value consumed
-        }
-    }
-    ;
-
 arithmetic_expression:
-    ID array_indices {
-        Symbol *symbol = lookupSymbol(currentTable, $1);
-        if (strcmp(symbol->type, "int") == 0) {
-            $$.type = "INT";
-        } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-            $$.type = "REAL";
-        } else if (strcmp(symbol->type, "bool") == 0) {
-            $$.type = "BOOL";
-        } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
-            $$.type = "STRING";
-        } else {
-            yyerror("Invalid type for array access");
-        }
-        $$.value = NULL;
-        // array access
-        // $$ = default_expr_error_value();
-        // if (!$2) {
-        //     yyerror("Invalid array access indices");
-        // } else {
-        //     Symbol *symbol = lookupSymbol(currentTable, $1);
-        //     if (symbol == NULL) {
-        //         yyerror("Undefined array variable");
-        //     } else if (!symbol->isArray) {
-        //         yyerror("Variable is not an array");
-        //     } else if (symbol->dimensions->num_dimensions != $2->num_indices) {
-        //         yyerror("Incorrect number of dimensions for array");
-        //     } else {
-        //         // bounds check
-        //         bool bounds_ok = true;
-        //         for (int i = 0; i < $2->num_indices; ++i) {
-        //             if ($2->indices[i] < 0 || $2->indices[i] >= symbol->dimensions->sizes[i]) {
-        //                 yyerror("Array index out of bounds");
-        //                 bounds_ok = false;
-        //                 break;
-        //             }
-        //         }
-
-        //         if (bounds_ok) {
-        //             void *element_ptr = get_md_array_element_ptr(symbol, $2);
-        //             if (element_ptr) {
-        //                 if (strcmp(symbol->type, "int") == 0) {
-        //                     $$.type = "INT";
-        //                     $$.value = NULL;
-        //                     // $$.value = malloc(sizeof(int));
-        //                     // *(int *)$$.value = *(int *)element_ptr;
-        //                 } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-        //                     $$.type = "REAL";
-        //                     $$.value = NULL;
-        //                     // $$.value = malloc(sizeof(float));
-        //                     // *(float *)$$.value = *(float *)element_ptr;
-        //                 } else if (strcmp(symbol->type, "bool") == 0) {
-        //                     $$.type = "BOOL";
-        //                     $$.value = NULL;
-        //                     // $$.value = malloc(sizeof(bool));
-        //                     // *(bool *)$$.value = *(bool *)element_ptr;
-        //                 } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
-        //                     $$.type = "STRING";
-        //                     $$.value = NULL;
-        //                     // $$.value = strdup(*(char **)element_ptr);
-        //                 } else {
-        //                     yyerror("Unsupported array type");
-        //                 }
-        //             } else {
-        //                 yyerror("Failed to access array element");
-        //             }
-        //         }
-        //     }
-        //     // clean up IndexAccessInfo
-        //     if ($2) {
-        //         free($2->indices);
-        //         free($2);
-        //     }
-        // }
-    }
-    | OP_SUB expression %prec OP_INC {
+    OP_SUB expression %prec OP_INC {
         // Unary minus
         if (strcmp($2.type, "INT") == 0) {
             $$.type = "INT";
@@ -930,25 +622,14 @@ expression:
         if (!symbol) {
             yyerror("Variable not declared");
             $$ = default_expr_error_value(); // Set to error value
-        } else if (symbol->isArray) {
-            yyerror("Need specify index for array variable");
-            $$ = default_expr_error_value(); // Set to error value
         } else {
             if (strcmp(symbol->type, "int") == 0) {
                 $$.type = "INT";
-                $$.value = malloc(sizeof(int));
-                *(int *)$$.value = symbol->value.intValue;
             } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
                 $$.type = "REAL";
-                $$.value = malloc(sizeof(float));
-                *(float *)$$.value = symbol->value.realValue;
             } else if (strcmp(symbol->type, "bool") == 0) {
                 $$.type = "BOOL";
-                $$.value = malloc(sizeof(bool));
-                *(bool *)$$.value = symbol->value.boolValue;
             } else if (strcmp(symbol->type, "string") == 0 || strcmp(symbol->type, "char") == 0) {
-                $$.type = "STRING";
-                $$.value = strdup(symbol->value.stringValue);
             }
         }
     }
@@ -1077,7 +758,6 @@ block:
 simple:
     assignment
     | print
-    | read
     | increment_decrement
     | semicolon_only
     | arithmetic_expression DELIM_SEMICOLON
@@ -1115,39 +795,6 @@ print:
     }
     ;
 
-read:
-    KW_READ ID DELIM_SEMICOLON {
-        // printf("Read statement: %s\n", $2); // for debugging
-        Symbol *symbol = lookupSymbol(currentTable, $2);
-        if (!symbol) {
-            yyerror("Variable not declared");
-        } else if (symbol->isConst) {
-            yyerror("Cannot assign to a constant variable");
-        } else {
-            if (strcmp(symbol->type, "int") == 0) {
-                // int value;
-                // scanf("%d", &value);
-                // symbol->value.intValue = value;
-            } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                // float value;
-                // scanf("%f", &value);
-                // symbol->value.realValue = value;
-            } else if (strcmp(symbol->type, "bool") == 0) {
-                // bool value;
-                // scanf("%d", &value);
-                // symbol->value.boolValue = value;
-            } else if (strcmp(symbol->type, "char") == 0 || strcmp(symbol->type, "string") == 0) {
-                // char value[100];
-                // scanf("%s", value);
-                // free(symbol->value.stringValue); // free old value
-                // symbol->value.stringValue = strdup(value);
-            } else {
-                yyerror("Invalid type for read statement");
-            }
-        }
-    }
-    ;
-
 increment_decrement:
     ID OP_INC DELIM_SEMICOLON {
         // printf("Increment statement: %s\n", $1); // for debugging
@@ -1175,9 +822,9 @@ increment_decrement:
             yyerror("Cannot assign to a constant variable");
         } else {
             if (strcmp(symbol->type, "int") == 0) {
-                symbol->value.intValue--;
+                // int decrement
             } else if (strcmp(symbol->type, "float") == 0 || strcmp(symbol->type, "double") == 0) {
-                symbol->value.realValue--;
+                // real decrement
             } else {
                 yyerror("Invalid type for decrement statement");
             }
@@ -1427,7 +1074,7 @@ function_declaration:
         // add all arguments to the symbol table
         Parameter *param = $4;
         while (param != NULL) {
-            insertSymbol(currentTable, param->name, param->type, 0, 0, NULL, NULL);
+            insertSymbol(currentTable, param->name, param->type, 0);
             param = param->next;
         }
     }
@@ -1481,7 +1128,7 @@ function_declaration:
         // add all arguments to the symbol table
         Parameter *param = $4;
         while (param != NULL) {
-            insertSymbol(currentTable, param->name, param->type, 0, 0, NULL, NULL);
+            insertSymbol(currentTable, param->name, param->type, 0);
             param = param->next;
         }
     }

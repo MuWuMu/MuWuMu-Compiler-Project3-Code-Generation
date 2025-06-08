@@ -15,4 +15,11 @@
 ## 已修正
 
 1, 4
+
+## Project3不須做
+
+1. floating-point numbers
+2. READ statements
+3. array declaration or uasge
+4. string variables, i.e. no assignments to string variables. Only string constants and string literals are provided for uses in PRINT statements.
     

@@ -5,35 +5,6 @@ float f;
 double d = 0.0;
 string s = "Hello, World!";
 
-// Array declarations
-bool bool_arr[3] = {true, false, true};
-const int const_int_arr[3] = {1, 2, 3};
-float float_arr[2][2];
-double double_arr[4];
-string string_arr[3] = {"test1", "test2", "test3"};
-
-// Function declarations
-bool test_func (bool a, bool b) {
-    return a || b;
-}
-int test_func2 (int a, int b) {
-    return a + b;
-}
-float test_func3 (float a, float b) {
-    return a + b;
-}
-double test_func4 (double a, double b) {
-    return a * b;
-}
-int test_func5 () {  // Function with no parameters
-    return i;   // Can access global variable
-}
-void test_func6 (int a, int b) { // Void function
-    int c = a + b;
-    print c;
-    return; // Void function cannot return
-}
-
 void main () {
 
     // Test some statements
@@ -50,10 +21,6 @@ void main () {
             // print
             print a;
             println "Hello, project2";
-
-            // read
-            read a;
-            read c; // cannot read const
 
             // increment and decrement
             a++;
@@ -74,16 +41,6 @@ void main () {
             check = 3.5; // cannot assign float to int
 
         }
-
-        // function invocation
-        test_func_no_declare(); // function not declared
-        e = test_func(true, false);
-        test_func2(a, const_int_arr[0]);
-        test_func3(1.1, 1.2);
-        test_func4(c, c);
-        test_func5();
-        test_func6(4, i);
-
     }
 
     // Conditional statements
@@ -95,9 +52,5 @@ void main () {
     } else {
         print b;
     }
-
-    // Loop
-    while (f == 1.0)
-        f++;
 
 }

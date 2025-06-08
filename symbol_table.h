@@ -6,8 +6,6 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "array_utils.h" // for DimensionInfo and array functions
-
 #define HASH_SIZE 211
 
 typedef struct Node {
@@ -22,16 +20,6 @@ typedef struct Symbol {
     char *name;       // id name
     char *type;       // id type
     int isConst;      // const or not
-    int isArray;     // array or not
-    // int arraySize;    // size of array if isArray is true
-    struct DimensionInfo *dimensions; // for multi-dimensional array
-    union {
-        bool boolValue;
-        int intValue;
-        float realValue; 
-        char *stringValue;
-        // void *arrayValue;
-    } value;             // value of the symbol
     struct Symbol *next; 
 } Symbol;
 
@@ -42,7 +30,7 @@ typedef struct SymbolTable {
 } SymbolTable;
 
 SymbolTable* createSymbolTable(SymbolTable *parent);
-void insertSymbol(SymbolTable *table, const char *name, const char *type, int isConst, int isArray, struct DimensionInfo *dims, void *data_ptr_or_value_ptr);
+void insertSymbol(SymbolTable *table, const char *name, const char *type, int isConst);
 Symbol* lookupSymbol(SymbolTable *table, const char *name);
 Symbol* lookupSymbolInCurrentTable(SymbolTable *table, const char *name);
 void deleteSymbolTable(SymbolTable *table);
