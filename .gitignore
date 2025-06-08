@@ -1,0 +1,8 @@
+*.sd
+!test.sd
+
+lex.yy.c
+y.tab.c
+y.tab.h
+
+parser.exe
