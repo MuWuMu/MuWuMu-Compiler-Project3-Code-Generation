@@ -8,11 +8,12 @@ class CodeGenerator {
 public:
     CodeGenerator(const std::string &filename); 
     ~CodeGenerator();
-
+    
     void emitClassStart(const std::string &class_name);
     void emitClassEnd();
-    void emitField(const std::string &name, const std::string &type);
-    void emitMethodStart(const std::string &name, const std::string &returnType, const std::string &params);
+    void emitField(const std::string &name, const std::string &type, const std::string &value);
+    void emitMethod(const std::string &name, const std::string &returnType, const std::string &params);
+    void emitMethodStart();
     void emitMethodEnd();
     void emitReturn();
 

@@ -32,27 +32,33 @@ void CodeGenerator::emitClassEnd() {
     emitTabs(); out << "}" << std::endl;
 }
 
-void CodeGenerator::emitField(const std::string &name, const std::string &type) {
-    emitTabs(); out << "field static " << type << " " << name << std::endl;
+//-------------------------------------------------------------
+
+void CodeGenerator::emitField(const std::string &name, const std::string &type, const std::string &value) {
+    emitTabs(); out << "field static " << type << " " << name;
+    if (!value.empty()) {
+        out << " = " << value << std::endl;
+    } else {
+        out << std::endl;
+    }
 }
 
-void CodeGenerator::emitMethodStart(const std::string &name, const std::string &returnType, const std::string &params) {
-    if (name == "main") {
-        emitTabs(); out << "method public static void main(java.lang.String[])" << std::endl;
-    } else {
-        emitTabs(); out << "method public static " << returnType << " " << name << "(" << params << ")" << std::endl;
-    }
+void CodeGenerator::emitMethod(const std::string &name, const std::string &returnType, const std::string &params) {
+    emitTabs(); out << "method public static " << returnType << " " << name << "(" << params << ")" << std::endl;
     emitTabs(); out << "max_stack 15" << std::endl;
     emitTabs(); out << "max_locals 15" << std::endl;
-    emitTabs(); out << "{" << std::endl;
-    increaseTab();
 }
 
-void CodeGenerator::emitReturn() {
-    emitTabs(); out << "return" << std::endl;
+void CodeGenerator::emitMethodStart() {
+    emitTabs(); out << "{" << std::endl;
+    increaseTab();
 }
 
 void CodeGenerator::emitMethodEnd() {
     decreaseTab();
     emitTabs(); out << "}" << std::endl;
+}
+
+void CodeGenerator::emitReturn() {
+    emitTabs(); out << "return" << std::endl;
 }

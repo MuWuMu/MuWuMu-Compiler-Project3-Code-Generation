@@ -1,0 +1,17 @@
+class test
+{
+    field static int a = 5
+    field static int c
+    field static int d
+    field static int b = 10
+    method public static int func(int, int)
+    max_stack 15
+    max_locals 15
+    {
+    }
+    method public static void main(java.lang.String[])
+    max_stack 15
+    max_locals 15
+    {
+    }
+}

@@ -20,6 +20,8 @@ extern int linenum;
 SymbolTable *currentTable = NULL;
 FunctionTable *functionTable = NULL;
 
+CodeGenerator *codeGen = NULL;
+
 // Helper variables for function return type checking
 char *current_function_name_for_return_check = NULL;
 char *current_function_return_type_for_return_check = NULL; // Stores "int", "float", "void", etc.
@@ -91,14 +93,17 @@ program:
     ;
 
 main_function:
-    KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR block
+    KW_VOID KW_MAIN DELIM_LPAR DELIM_RPAR {
+        codeGen->emitMethod("main", "void", "java.lang.String[]");
+        codeGen->emitMethodStart();
+    } block {
+        codeGen->emitMethodEnd();
+    }
     ;
 
 declaration:
     // single or multiple declaration
     type_specifier declarator_list DELIM_SEMICOLON {
-        // printf("Declaration without initialization: type=%s\n", $1);    // for debugging
-
         // traverse declarator_list，insert each one into symbol table
         Node *current = $2;
         while (current != NULL) {
@@ -114,9 +119,28 @@ declaration:
                     yyerror("Type mismatch in declaration");
                 else if (current->type == "STRING" && $1 != "string" && $1 != "char")
                     yyerror("Type mismatch in declaration");
-            } else {
-                insertSymbol(currentTable, current->name, $1, 0);
             }
+            insertSymbol(currentTable, current->name, $1, 0);
+                // code generation
+                if (currentTable->parent == NULL) {
+                    // Global variable
+                    std::string tmpValueStr = "";
+                    if (current->value != NULL) {
+                        if (current->type == "INT") {
+                            tmpValueStr = std::to_string(*(int *)current->value);
+                        } else if (current->type == "REAL") {
+                            tmpValueStr = std::to_string(*(float *)current->value);
+                        } else if (current->type == "BOOL") {
+                            tmpValueStr = (*(bool *)current->value) ? "true" : "false";
+                        } else if (current->type == "STRING") {
+                            tmpValueStr = "\"" + std::string((char *)current->value) + "\"";
+                        }
+                    }
+                    codeGen->emitField(current->name, $1, tmpValueStr);
+                    // TODO: assign must be out eg. field static integer b = 10
+                } else {
+                    // TODO: Local variable
+                }
             current = current->next;
         }
     }
@@ -128,6 +152,8 @@ declaration:
         while (current != NULL) {
             if (lookupSymbolInCurrentTable(currentTable, current->name)) {
                 yyerror("Duplicate declaration of variable");
+            } else if (current->value == NULL) {
+                yyerror("Const variable must be initialized");
             } else if (current->type != NULL) {
                 // type check
                 if (current->type == "INT" && $2 != "int") 
@@ -138,16 +164,35 @@ declaration:
                     yyerror("Type mismatch in declaration");
                 else if (current->type == "STRING" && $2 != "string" && $2 != "char")
                     yyerror("Type mismatch in declaration");
-            } else if (current->value == NULL) {
-                yyerror("Const variable must be initialized");
-            } else {
+
                 insertSymbol(currentTable, current->name, $2, 1); // set as const
-                // printf("Initialized const variable: %s with value\n", current->name);   // for debugging
+                
+            } 
+            // code generation
+            if (currentTable->parent == NULL) {
+                // Global variable
+                std::string tmpValueStr = "";
+                if (current->value != NULL) {
+                    if (current->type == "INT") {
+                        tmpValueStr = std::to_string(*(int *)current->value);
+                    } else if (current->type == "REAL") {
+                        tmpValueStr = std::to_string(*(float *)current->value);
+                    } else if (current->type == "BOOL") {
+                        tmpValueStr = (*(bool *)current->value) ? "true" : "false";
+                    } else if (current->type == "STRING") {
+                        tmpValueStr = "\"" + std::string((char *)current->value) + "\"";
+                    }
+                }
+                codeGen->emitField(current->name, $2, tmpValueStr);
+                // TODO: assign must be out eg. field static integer b = 10
+            } else {
+                // TODO: Local variable
             }
             current = current->next;
         }
     }
     ;
+    
 type_specifier:
     KW_INT { $$ = "int";}
     | KW_FLOAT { $$ = "float";}
@@ -1051,6 +1096,7 @@ function_declaration:
         } else {
             // check if parameter list has duplicate names
             Parameter *param = $4;
+            std::string paramStr;
             while (param != NULL) {
                 Parameter *nextParam = param->next;
                 while (nextParam != NULL) {
@@ -1059,12 +1105,28 @@ function_declaration:
                     }
                     nextParam = nextParam->next;
                 }
+
+                if (!paramStr.empty()) {
+                    paramStr += ", ";
+                }
+                if (param->type) {
+                    paramStr += param->type;
+                }
+                // if (param->name) {
+                //     paramStr += " ";
+                //     paramStr += param->name;
+                // }
+
                 param = param->next;
                 if (param != NULL) // Avoid dereferencing NULL pointer
                     nextParam = param->next;
             }
             // add function to the function table
             insertFunction(functionTable, $2, $1, $4);
+
+            // code generation
+            codeGen->emitMethod($2, $1, paramStr);
+            codeGen->emitMethodStart();
 
             current_function_name_for_return_check = $2;
             current_function_return_type_for_return_check = $1; // store the declared return type
@@ -1094,6 +1156,10 @@ function_declaration:
         deleteSymbolTable(currentTable);
         currentTable = parentTable;
 
+        // code generation
+        // TODO: return code generation
+        codeGen->emitMethodEnd();
+
         // clear function helpsers
         current_function_name_for_return_check = NULL;
         current_function_return_type_for_return_check = NULL;
@@ -1105,20 +1171,38 @@ function_declaration:
         } else {
             // check if parameter list has duplicate names
             Parameter *param = $4;
+            std::string paramStr;
             while (param != NULL) {
                 Parameter *nextParam = param->next;
                 while (nextParam != NULL) {
+
                     if (strcmp(param->name, nextParam->name) == 0) {
                         yyerror("Duplicate parameter name in function declaration");
                     }
                     nextParam = nextParam->next;
                 }
+
+                if (!paramStr.empty()) {
+                    paramStr += ", ";
+                }
+                if (param->type) {
+                    paramStr += param->type;
+                }
+                // if (param->name) {
+                //     paramStr += " ";
+                //     paramStr += param->name;
+                // }
+
                 param = param->next;
                 if (param != NULL) // Avoid dereferencing NULL pointer
                     nextParam = param->next;
             }
             // add function to the function table
             insertFunction(functionTable, $2, "void", $4);
+
+            // code generation
+            codeGen->emitMethod($2, "void", paramStr);
+            codeGen->emitMethodStart();
 
             current_function_name_for_return_check = $2;
             current_function_return_type_for_return_check = "void"; // store the declared return type
@@ -1144,6 +1228,9 @@ function_declaration:
         dumpSymbolTable(currentTable);
         deleteSymbolTable(currentTable);
         currentTable = parentTable;
+
+        // code generation
+        codeGen->emitMethodEnd();
 
         current_function_name_for_return_check = NULL;
         current_function_return_type_for_return_check = NULL;
@@ -1299,7 +1386,7 @@ int main(int argc, char **argv) {
     std::string class_name = (last_dot == std::string::npos) ? filename : filename.substr(0, last_dot);
 
     // create class code generator
-    CodeGenerator codeGen(class_name);
+    codeGen = new CodeGenerator(class_name);
 
     printf("Starting parsing...\n");
 
@@ -1319,6 +1406,8 @@ int main(int argc, char **argv) {
         currentTable = NULL;
         deleteFunctionTable(functionTable);
         functionTable = NULL;
+        delete codeGen;
+        codeGen = NULL;
         printf("Parsing done.\n");
     } else {
         printf("Parsing failed.\n");

@@ -1,2 +1,8 @@
+int a = 5;
+int c, d;
+int b = 10;
+int func(int x, int y) {
+    return 0;
+}
 void main () {
 }
