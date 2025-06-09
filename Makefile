@@ -6,6 +6,7 @@ FUNCTION_TABLE = function_table.c
 CODE_GENERATION = code_generation.cpp
 EXEC = parser
 TEST_FILE = test.sd
+CXX = g++
 
 all: $(EXEC)
 	@echo "Build complete. Running parser with $(TEST_FILE)..."
@@ -13,7 +14,7 @@ all: $(EXEC)
 
 
 $(EXEC): $(LEX) $(YACC_C) $(SYMBOL_TABLE) $(FUNCTION_TABLE) $(CODE_GENERATION)
-	gcc $(LEX) $(YACC_C) $(SYMBOL_TABLE) $(FUNCTION_TABLE) $(CODE_GENERATION) -o $(EXEC)
+	$(CXX) $(LEX) $(YACC_C) $(SYMBOL_TABLE) $(FUNCTION_TABLE) $(CODE_GENERATION) -o $(EXEC)
 
 $(LEX): scanner.l
 	lex scanner.l
